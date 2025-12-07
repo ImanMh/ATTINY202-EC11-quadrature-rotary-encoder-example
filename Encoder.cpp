@@ -101,26 +101,40 @@ SIGNAL(TIMER1_COMPA_vect)
 #elif defined(__AVR_ATtiny202__) || defined(__AVR_ATtiny402__) || defined(__AVR_ATtiny204__) || defined(__AVR_ATtiny404__) || defined(ARDUINO_AVR_ATtiny202) || defined(ARDUINO_AVR_ATtiny402) || defined(ARDUINO_AVR_ATtiny204) || defined(ARDUINO_AVR_ATtiny404)
 void setupTimerInterrupt()
 {
-  // ATTiny202/402/204/404: Use TCB0 timer (TCA0 is used by millis())
-  // For 20MHz clock with prescaler 2 (CLK_PER/2): 20000000 / 2 / 10000 = 1000
-  // But we need to use a smaller prescaler or adjust period
-  // Using CLK_PER/2 prescaler: 20000000 / 2 = 10MHz, for 10kHz: 10000000 / 10000 = 1000
-  // TCB period is 16-bit, so we can use 1000
+  // ATTiny202/402/204/404: Use TCB0 timer for encoder polling
+  // Note: TCA0 is used by millis(), so we use TCB0 to avoid conflicts
+  //
+  // Timer configuration uses INTERRUPT_PERIOD from Encoder.h
+  // - CPU clock: 20MHz (F_CPU)
+  // - Prescaler: CLK_PER/2 (10MHz timer clock)
+  // - Period calculation: Convert INTERRUPT_PERIOD (for 16MHz/64) to ATTiny202 (20MHz/2)
+  //   Original: 16MHz / 64 = 250kHz timer clock, INTERRUPT_PERIOD = 25 for 10kHz
+  //   ATTiny202: 20MHz / 2 = 10MHz timer clock
+  //   Conversion factor: 10,000,000 / 250,000 = 40
+  //   Period = INTERRUPT_PERIOD * 40
+  //
+  // To change frequency, modify INTERRUPT_PERIOD in Encoder.h:
+  // - 25 = 10kHz (0.1ms) - default
+  // - 50 = 5kHz (0.2ms)
+  // - 12 = 20kHz (0.05ms)
   
-  TCB0.CTRLA = 0;  // Disable timer first
-  TCB0.CTRLB = 0;  // Periodic interrupt mode
-  TCB0.CCMP = 1000 - 1;  // Period: 1000 counts = 10kHz at 10MHz (20MHz/2)
-  TCB0.CNT = 0;  // Reset counter
-  TCB0.INTCTRL = TCB_CAPT_bm;  // Enable capture interrupt (used for periodic mode)
+  uint16_t period = ((uint16_t)INTERRUPT_PERIOD * 40);  // Convert to ATTiny202 timer clock
   
-  // Set prescaler to CLK_PER/2 and enable
+  TCB0.CTRLA = 0;                    // Disable timer before configuration
+  TCB0.CTRLB = 0;                    // Periodic interrupt mode
+  TCB0.CCMP = period - 1;             // Set period (converted from INTERRUPT_PERIOD)
+  TCB0.CNT = 0;                       // Reset counter to zero
+  TCB0.INTCTRL = TCB_CAPT_bm;        // Enable capture interrupt (periodic mode)
+  
+  // Enable timer with CLK_PER/2 prescaler
   TCB0.CTRLA = TCB_CLKSEL_CLKDIV2_gc | TCB_ENABLE_bm;
 }
 
 ISR(TCB0_INT_vect)
 {
+  // Timer interrupt: poll encoder state and update position
   computeEncoder();
-  TCB0.INTFLAGS = TCB_CAPT_bm;  // Clear interrupt flag
+  TCB0.INTFLAGS = TCB_CAPT_bm;       // Clear interrupt flag
 }
 
 #else

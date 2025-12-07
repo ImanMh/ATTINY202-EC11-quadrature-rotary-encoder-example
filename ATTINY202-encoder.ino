@@ -1,60 +1,88 @@
+/*
+ * ATTiny202 Rotary Encoder with LED Feedback
+ * 
+ * This sketch uses the John-Lluch Encoder library to read a rotary encoder
+ * and provides visual feedback via LEDs for clockwise and counter-clockwise rotation.
+ * 
+ * Hardware:
+ * - Encoder channel A connected to pin 1 (CH_A)
+ * - Encoder channel B connected to pin 2 (CH_B)
+ * - LED for clockwise rotation on pin 4 (LED_PIN_CW)
+ * - LED for counter-clockwise rotation on pin 0 (LED_PIN_CCW)
+ * 
+ * The encoder is configured as active-low with internal pull-ups enabled.
+ */
+
 #include "Encoder.h"
 
-// Pin definitions from our hardware setup
-#define LED_PIN_CCW 0
-#define LED_PIN_CW 4
-#define CH_A 1
-#define CH_B 2
-#define CH_P 255  // No pushbutton, use invalid pin number
+// ============================================================================
+// Hardware Pin Definitions
+// ============================================================================
+#define CH_A           1    // Encoder channel A pin
+#define CH_B           2    // Encoder channel B pin
+#define CH_P           255  // Pushbutton pin (not used, set to invalid pin)
+#define LED_PIN_CW     4    // LED for clockwise rotation
+#define LED_PIN_CCW    0    // LED for counter-clockwise rotation
 
-// create an encoder object initialized with their pins
-Encoder encoder( CH_A, CH_B, CH_P );
+// ============================================================================
+// Configuration Constants
+// ============================================================================
+#define INTERRUPT_PERIOD       25   // Timer interrupt period (25 = 10kHz, 0.1ms sampling)
+#define LED_BLINK_DURATION_MS  100  // LED blink duration in milliseconds
 
-// LED control
+// ============================================================================
+// Global Variables
+// ============================================================================
+Encoder encoder(CH_A, CH_B, CH_P);
+
+// LED control counters (decremented each millisecond)
 volatile uint16_t ledCWCounter = 0;
 volatile uint16_t ledCCWCounter = 0;
-#define LED_BLINK_DURATION 100  // milliseconds
 
-// setup code
+// ============================================================================
+// Setup Function
+// ============================================================================
 void setup() 
 {
-  // Configure LED pins as outputs
+  // Initialize LED pins as outputs
   pinMode(LED_PIN_CW, OUTPUT);
   pinMode(LED_PIN_CCW, OUTPUT);
   digitalWrite(LED_PIN_CW, LOW);
   digitalWrite(LED_PIN_CCW, LOW);
   
-  // start the encoder time interrupts
-  EncoderInterrupt.begin( &encoder );
+  // Initialize encoder with timer-based interrupts
+  // This sets up a 10kHz timer interrupt to poll the encoder state
+  EncoderInterrupt.begin(&encoder);
 }
 
-// loop code
+// ============================================================================
+// Main Loop
+// ============================================================================
 void loop()
 {
-  // get the encoder variation since our last check, it can be positive or negative, or zero if the encoder didn't move
-  // only call this once per loop cycle, or at any time you want to know any incremental change
+  // Read encoder movement since last call
+  // Returns positive for clockwise, negative for counter-clockwise, 0 if no movement
   int delta = encoder.delta();
 
-  // Process encoder movement for LED control
+  // Update LED blink counters based on encoder movement
   if (delta != 0) {
     if (delta > 0) {
-      // Clockwise rotation
-      ledCWCounter = LED_BLINK_DURATION;
+      // Clockwise rotation detected
+      ledCWCounter = LED_BLINK_DURATION_MS;
     } else {
-      // Counter-clockwise rotation
-      ledCCWCounter = LED_BLINK_DURATION;
+      // Counter-clockwise rotation detected
+      ledCCWCounter = LED_BLINK_DURATION_MS;
     }
   }
 
-  // Update LED blink counters and control
-  static uint32_t lastUpdate = 0;
-  uint32_t currentMillis = millis();
+  // Update LED states every millisecond
+  static uint32_t lastUpdateTime = 0;
+  uint32_t currentTime = millis();
   
-  // Update every millisecond
-  if (currentMillis != lastUpdate) {
-    lastUpdate = currentMillis;
+  if (currentTime != lastUpdateTime) {
+    lastUpdateTime = currentTime;
     
-    // Update LED blink counters and control
+    // Update clockwise LED
     if (ledCWCounter > 0) {
       digitalWrite(LED_PIN_CW, HIGH);
       ledCWCounter--;
@@ -62,6 +90,7 @@ void loop()
       digitalWrite(LED_PIN_CW, LOW);
     }
     
+    // Update counter-clockwise LED
     if (ledCCWCounter > 0) {
       digitalWrite(LED_PIN_CCW, HIGH);
       ledCCWCounter--;
