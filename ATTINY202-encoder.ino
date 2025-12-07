@@ -1,26 +1,31 @@
 /*
- * ATTiny202 Rotary Encoder with LED Feedback
+ * ATTiny202 Rotary Encoder with I2C Interface
  * 
  * This sketch uses the John-Lluch Encoder library to read a rotary encoder
- * and provides visual feedback via LEDs for clockwise and counter-clockwise rotation.
+ * and exposes the encoder position counter via I2C.
  * 
  * Hardware (megaTinyCore pin numbers):
  * - Encoder channel A connected to pin 0 (CH_A) = PA6 (physical pin 2)
  * - Encoder channel B connected to pin 1 (CH_B) = PA7 (physical pin 3)
- * - LED for clockwise rotation on pin 4 (LED_PIN_CW) = PA3 (physical pin 7)
- * - LED for counter-clockwise rotation on pin 0 (LED_PIN_CCW) = PA6 (physical pin 2)
+ * - I2C SDA on pin 3 (PA2, physical pin 5)
+ * - I2C SCL on pin 2 (PA1, physical pin 4)
  * 
  * Pin mapping (pin number → Port pin → Physical pin):
  *   0 → PA6 → 2
  *   1 → PA7 → 3
- *   2 → PA1 → 4
- *   3 → PA2 → 5
+ *   2 → PA1 → 4  (I2C SCL)
+ *   3 → PA2 → 5  (I2C SDA)
  *   4 → PA3 → 7
+ * 
+ * I2C Configuration:
+ * - Slave address: 0x08
+ * - Responds to I2C read requests with 4-byte int32_t encoder counter value
  * 
  * The encoder is configured as active-low with internal pull-ups enabled.
  */
 
 #include "Encoder.h"
+#include <Wire.h>
 
 // ============================================================================
 // Hardware Pin Definitions
@@ -28,34 +33,47 @@
 #define CH_A           0    // Encoder channel A pin (PA6, physical pin 2)
 #define CH_B           1    // Encoder channel B pin (PA7, physical pin 3)
 #define CH_P           255  // Pushbutton pin (not used, set to invalid pin)
-#define LED_PIN_CW     4    // LED for clockwise rotation (PA3, physical pin 7)
-#define LED_PIN_CCW    0    // LED for counter-clockwise rotation (PA6, physical pin 2)
+// #define I2C_SCL_PIN    2    // I2C SCL pin (PA1, physical pin 4)
+// #define I2C_SDA_PIN    3    // I2C SDA pin (PA2, physical pin 5)
 
 // ============================================================================
 // Configuration Constants
 // ============================================================================
 #define INTERRUPT_PERIOD       25   // Timer interrupt period (25 = 10kHz, 0.1ms sampling)
-#define LED_BLINK_DURATION_MS  100  // LED blink duration in milliseconds
+#define I2C_SLAVE_ADDRESS      0x08 // I2C slave address
 
 // ============================================================================
 // Global Variables
 // ============================================================================
 Encoder encoder(CH_A, CH_B, CH_P);
 
-// LED control counters (decremented each millisecond)
-volatile uint16_t ledCWCounter = 0;
-volatile uint16_t ledCCWCounter = 0;
+// Encoder position counter (accumulated from encoder deltas)
+// Must be volatile since it's read from interrupt context (I2C requestEvent)
+volatile int32_t encoderCounter = 0;
+
+// ============================================================================
+// I2C Request Handler
+// ============================================================================
+void requestEvent() {
+  // Send encoder counter as 4 bytes (int32_t, little-endian)
+  // Read atomically by copying to local variable (32-bit read on 8-bit CPU needs protection)
+  int32_t counterCopy;
+  noInterrupts();
+  counterCopy = encoderCounter;
+  interrupts();
+  
+  uint8_t* counterPtr = (uint8_t*)&counterCopy;
+  Wire.write(counterPtr, 4);
+}
 
 // ============================================================================
 // Setup Function
 // ============================================================================
 void setup() 
 {
-  // Initialize LED pins as outputs
-  pinMode(LED_PIN_CW, OUTPUT);
-  pinMode(LED_PIN_CCW, OUTPUT);
-  digitalWrite(LED_PIN_CW, LOW);
-  digitalWrite(LED_PIN_CCW, LOW);
+  // Initialize I2C as slave with explicit pin configuration
+  Wire.begin(I2C_SLAVE_ADDRESS);
+  Wire.onRequest(requestEvent);  // Register callback for I2C read requests
   
   // Initialize encoder with timer-based interrupts
   // This sets up a 10kHz timer interrupt to poll the encoder state
@@ -71,38 +89,15 @@ void loop()
   // Returns positive for clockwise, negative for counter-clockwise, 0 if no movement
   int delta = encoder.delta();
 
-  // Update LED blink counters based on encoder movement
+  // Update encoder counter (atomic operation - delta() already handles synchronization)
   if (delta != 0) {
-    if (delta > 0) {
-      // Clockwise rotation detected
-      ledCWCounter = LED_BLINK_DURATION_MS;
-    } else {
-      // Counter-clockwise rotation detected
-      ledCCWCounter = LED_BLINK_DURATION_MS;
-    }
+    // Update counter atomically by disabling interrupts briefly
+    noInterrupts();
+    encoderCounter += delta;
+    interrupts();
   }
-
-  // Update LED states every millisecond
-  static uint32_t lastUpdateTime = 0;
-  uint32_t currentTime = millis();
   
-  if (currentTime != lastUpdateTime) {
-    lastUpdateTime = currentTime;
-    
-    // Update clockwise LED
-    if (ledCWCounter > 0) {
-      digitalWrite(LED_PIN_CW, HIGH);
-      ledCWCounter--;
-    } else {
-      digitalWrite(LED_PIN_CW, LOW);
-    }
-    
-    // Update counter-clockwise LED
-    if (ledCCWCounter > 0) {
-      digitalWrite(LED_PIN_CCW, HIGH);
-      ledCCWCounter--;
-    } else {
-      digitalWrite(LED_PIN_CCW, LOW);
-    }
-  }
+  // Main loop can do other tasks here if needed
+  // The encoder counter is updated in the interrupt context via encoder.delta()
+  // and exposed via I2C in the requestEvent() callback
 }
