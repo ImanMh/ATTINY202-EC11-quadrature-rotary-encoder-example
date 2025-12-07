@@ -4,11 +4,18 @@
  * This sketch uses the John-Lluch Encoder library to read a rotary encoder
  * and provides visual feedback via LEDs for clockwise and counter-clockwise rotation.
  * 
- * Hardware:
- * - Encoder channel A connected to pin 1 (CH_A)
- * - Encoder channel B connected to pin 2 (CH_B)
- * - LED for clockwise rotation on pin 4 (LED_PIN_CW)
- * - LED for counter-clockwise rotation on pin 0 (LED_PIN_CCW)
+ * Hardware (megaTinyCore pin numbers):
+ * - Encoder channel A connected to pin 0 (CH_A) = PA6 (physical pin 2)
+ * - Encoder channel B connected to pin 1 (CH_B) = PA7 (physical pin 3)
+ * - LED for clockwise rotation on pin 4 (LED_PIN_CW) = PA3 (physical pin 7)
+ * - LED for counter-clockwise rotation on pin 0 (LED_PIN_CCW) = PA6 (physical pin 2)
+ * 
+ * Pin mapping (pin number → Port pin → Physical pin):
+ *   0 → PA6 → 2
+ *   1 → PA7 → 3
+ *   2 → PA1 → 4
+ *   3 → PA2 → 5
+ *   4 → PA3 → 7
  * 
  * The encoder is configured as active-low with internal pull-ups enabled.
  */
@@ -18,11 +25,11 @@
 // ============================================================================
 // Hardware Pin Definitions
 // ============================================================================
-#define CH_A           1    // Encoder channel A pin
-#define CH_B           2    // Encoder channel B pin
+#define CH_A           0    // Encoder channel A pin (PA6, physical pin 2)
+#define CH_B           1    // Encoder channel B pin (PA7, physical pin 3)
 #define CH_P           255  // Pushbutton pin (not used, set to invalid pin)
-#define LED_PIN_CW     4    // LED for clockwise rotation
-#define LED_PIN_CCW    0    // LED for counter-clockwise rotation
+#define LED_PIN_CW     4    // LED for clockwise rotation (PA3, physical pin 7)
+#define LED_PIN_CCW    0    // LED for counter-clockwise rotation (PA6, physical pin 2)
 
 // ============================================================================
 // Configuration Constants

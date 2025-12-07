@@ -20,12 +20,14 @@ A robust rotary encoder implementation for ATTiny202 microcontrollers using time
 
 ## Pin Connections
 
-| Component | Pin | Description |
-|-----------|-----|-------------|
-| Encoder Channel A | 1 | Encoder quadrature output A |
-| Encoder Channel B | 2 | Encoder quadrature output B |
-| LED (Clockwise) | 4 | Lights up on clockwise rotation |
-| LED (Counter-clockwise) | 0 | Lights up on counter-clockwise rotation |
+| Component | Pin | Port Pin | Physical Pin | Description |
+|-----------|-----|----------|--------------|-------------|
+| Encoder Channel A | 0 | PA6 | 2 | Encoder quadrature output A |
+| Encoder Channel B | 1 | PA7 | 3 | Encoder quadrature output B |
+| LED (Clockwise) | 4 | PA3 | 7 | Lights up on clockwise rotation |
+| LED (Counter-clockwise) | 0 | PA6 | 2 | Lights up on counter-clockwise rotation |
+
+**Note:** Pin numbers used in code (e.g., `pinMode(0, OUTPUT)`) are defined by megaTinyCore. These map to port pins (PA0-PA7) and physical package pins according to megaTinyCore's pin mapping.
 
 ## Library Credit
 
@@ -150,7 +152,7 @@ This project is designed for use with:
 
 ### Encoder not detected
 - Verify encoder is active-low configuration
-- Check pin connections (CH_A = pin 1, CH_B = pin 2)
+- Check pin connections (CH_A = pin 0/PA6, CH_B = pin 1/PA7)
 - Try adjusting `INTERRUPT_PERIOD` if encoder is very fast/slow
 
 ### Timer conflicts
