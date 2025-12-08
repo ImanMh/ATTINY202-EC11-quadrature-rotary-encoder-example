@@ -33,8 +33,7 @@
 #define CH_A           0    // Encoder channel A pin (PA6, physical pin 2)
 #define CH_B           1    // Encoder channel B pin (PA7, physical pin 3)
 #define CH_P           255  // Pushbutton pin (not used, set to invalid pin)
-// #define I2C_SCL_PIN    2    // I2C SCL pin (PA1, physical pin 4)
-// #define I2C_SDA_PIN    3    // I2C SDA pin (PA2, physical pin 5)
+#define DEBUG_PIN      4    // Debug pin (PA3, physical pin 7)
 
 // ============================================================================
 // Configuration Constants
@@ -52,18 +51,28 @@ Encoder encoder(CH_A, CH_B, CH_P);
 volatile int32_t encoderCounter = 0;
 
 // ============================================================================
-// I2C Request Handler
+// I2C Event Handlers
 // ============================================================================
+void receiveEvent(int numBytes) {
+  // DEBUG: Toggle to verify ANY I2C traffic is received
+  static bool toggle = false;
+  digitalWrite(DEBUG_PIN, toggle);
+  toggle = !toggle;
+  
+  while(Wire.available()) Wire.read();
+}
+
 void requestEvent() {
-  // Send encoder counter as 4 bytes (int32_t, little-endian)
-  // Read atomically by copying to local variable (32-bit read on 8-bit CPU needs protection)
+  // DEBUG: Toggle to verify requestEvent is called
+  static bool toggle = false;
+  digitalWrite(DEBUG_PIN, toggle);
+  toggle = !toggle;
+  
   int32_t counterCopy;
   noInterrupts();
   counterCopy = encoderCounter;
   interrupts();
-  
-  uint8_t* counterPtr = (uint8_t*)&counterCopy;
-  Wire.write(counterPtr, 4);
+  Wire.write((uint8_t*)&counterCopy, 4);
 }
 
 // ============================================================================
@@ -71,13 +80,16 @@ void requestEvent() {
 // ============================================================================
 void setup() 
 {
-  // Initialize I2C as slave with explicit pin configuration
-  Wire.begin(I2C_SLAVE_ADDRESS);
-  Wire.onRequest(requestEvent);  // Register callback for I2C read requests
+  pinMode(DEBUG_PIN, OUTPUT);
+  digitalWrite(DEBUG_PIN, LOW);
   
-  // Initialize encoder with timer-based interrupts
-  // This sets up a 10kHz timer interrupt to poll the encoder state
-  EncoderInterrupt.begin(&encoder);
+  // TEST: Initialize I2C WITHOUT encoder to check for conflicts
+  Wire.begin(I2C_SLAVE_ADDRESS);
+  Wire.onRequest(requestEvent);
+  Wire.onReceive(receiveEvent);
+  
+  // Temporarily disable encoder to test I2C alone
+  // EncoderInterrupt.begin(&encoder);
 }
 
 // ============================================================================
@@ -85,19 +97,11 @@ void setup()
 // ============================================================================
 void loop()
 {
-  // Read encoder movement since last call
-  // Returns positive for clockwise, negative for counter-clockwise, 0 if no movement
-  int delta = encoder.delta();
-
-  // Update encoder counter (atomic operation - delta() already handles synchronization)
-  if (delta != 0) {
-    // Update counter atomically by disabling interrupts briefly
-    noInterrupts();
-    encoderCounter += delta;
-    interrupts();
-  }
-  
-  // Main loop can do other tasks here if needed
-  // The encoder counter is updated in the interrupt context via encoder.delta()
-  // and exposed via I2C in the requestEvent() callback
+  // Temporarily disabled for I2C testing
+  // int delta = encoder.delta();
+  // if (delta != 0) {
+  //   noInterrupts();
+  //   encoderCounter += delta;
+  //   interrupts();
+  // }
 }
