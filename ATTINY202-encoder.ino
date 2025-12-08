@@ -5,8 +5,8 @@
  * and exposes the encoder position counter via I2C.
  * 
  * Hardware (megaTinyCore pin numbers):
- * - Encoder channel A connected to pin 0 (CH_A) = PA6 (physical pin 2)
- * - Encoder channel B connected to pin 1 (CH_B) = PA7 (physical pin 3)
+ * - Encoder channel B connected to pin 0 (CH_B) = PA6 (physical pin 2)
+ * - Encoder channel A connected to pin 1 (CH_A) = PA7 (physical pin 3)
  * - I2C SDA on pin 3 (PA2, physical pin 5)
  * - I2C SCL on pin 2 (PA1, physical pin 4)
  * 
@@ -30,10 +30,9 @@
 // ============================================================================
 // Hardware Pin Definitions
 // ============================================================================
-#define CH_A           0    // Encoder channel A pin (PA6, physical pin 2)
-#define CH_B           1    // Encoder channel B pin (PA7, physical pin 3)
+#define CH_B           0    // Encoder channel B pin (PA6, physical pin 2)
+#define CH_A           1    // Encoder channel A pin (PA7, physical pin 3)
 #define CH_P           255  // Pushbutton pin (not used, set to invalid pin)
-#define DEBUG_PIN      4    // Debug pin (PA3, physical pin 7)
 
 // ============================================================================
 // Configuration Constants
@@ -54,20 +53,10 @@ volatile int32_t encoderCounter = 0;
 // I2C Event Handlers
 // ============================================================================
 void receiveEvent(int numBytes) {
-  // DEBUG: Toggle to verify ANY I2C traffic is received
-  static bool toggle = false;
-  digitalWrite(DEBUG_PIN, toggle);
-  toggle = !toggle;
-  
   while(Wire.available()) Wire.read();
 }
 
 void requestEvent() {
-  // DEBUG: Toggle to verify requestEvent is called
-  static bool toggle = false;
-  digitalWrite(DEBUG_PIN, toggle);
-  toggle = !toggle;
-  
   int32_t counterCopy;
   noInterrupts();
   counterCopy = encoderCounter;
@@ -80,16 +69,11 @@ void requestEvent() {
 // ============================================================================
 void setup() 
 {
-  pinMode(DEBUG_PIN, OUTPUT);
-  digitalWrite(DEBUG_PIN, LOW);
-  
-  // TEST: Initialize I2C WITHOUT encoder to check for conflicts
   Wire.begin(I2C_SLAVE_ADDRESS);
   Wire.onRequest(requestEvent);
   Wire.onReceive(receiveEvent);
   
-  // Temporarily disable encoder to test I2C alone
-  // EncoderInterrupt.begin(&encoder);
+  EncoderInterrupt.begin(&encoder);
 }
 
 // ============================================================================
@@ -97,11 +81,10 @@ void setup()
 // ============================================================================
 void loop()
 {
-  // Temporarily disabled for I2C testing
-  // int delta = encoder.delta();
-  // if (delta != 0) {
-  //   noInterrupts();
-  //   encoderCounter += delta;
-  //   interrupts();
-  // }
+  int delta = encoder.deltaTick2();
+  if (delta != 0) {
+    noInterrupts();
+    encoderCounter += delta;
+    interrupts();
+  }
 }
